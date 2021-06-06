@@ -1,3 +1,0 @@
-FileNotFoundError in line 14 of /Users/xiaoyu/GitHub/wgbs/Snakefile:
-[Errno 2] No such file or directory: '/scratch/pangenome/mgi_dt_2863703/'
-  File "/Users/xiaoyu/GitHub/wgbs/Snakefile", line 14, in <module>
