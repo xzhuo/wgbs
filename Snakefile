@@ -1,9 +1,13 @@
 import re
 from datetime import datetime
 
-PHIX_REF = "/echofs1/data/xiaoyu/genomes/phiX174/phiX174.fa"
-LAMBDA_DIR = "/echofs1/data/xiaoyu/genomes/lambda"
-HUMAN_DIR = "/echofs1/data/xiaoyu/genomes/hg38"
+# PHIX_REF = "/echofs1/data/xiaoyu/genomes/phiX174/phiX174.fa"
+# LAMBDA_DIR = "/echofs1/data/xiaoyu/genomes/lambda"
+# HUMAN_DIR = "/echofs1/data/xiaoyu/genomes/hg38"
+PHIX_REF = "/scratch/genomes/phiX174/bwa_index/phiX174.fa"
+LAMBDA_DIR = "/scratch/genomes/lambda"
+HUMAN_DIR = "/scratch/genomes/hg38/bismark"
+HG_QC = "/scratch/genomes/hg38/wgbs_qc"
 TMP_DIR = "/tmp"
 QC_DIR = "0_fastqc"
 TRIM_DIR = "1_trim"
@@ -11,11 +15,16 @@ PHIX_DIR = "1_phix"
 BISMARK_LAMBDA = "2_bismark_lambda"
 BISMARK = "2_bismark"
 PRESEQ = "3_preseq"
+INSERT_CPG_BIAS = "4_insert_cpg_bias"
+COVERAGE = "5_coverage"
+TRACKS = "6_tracks"
 
-shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.18.1 preseq/3.1.2 bedtools/2.27.1 R/3.6.1;")
+shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.18.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1 r-ggplot2/2.2.1-python-2.7.15-java-11-r-3.5.1;")
 
 # pattern = re.compile(r'\.fastq.gz$')
-SAMPLES = list(map(lambda x: x[:-12], filter(lambda y: y.endswith('.fastq.gz'), os.listdir("."))))
+SUFFIX = '.fastq.gz'
+suffix_length = SUFFIX.length() + 3
+SAMPLES = list(map(lambda x: x[:-suffix_length], filter(lambda y: y.endswith(SUFFIX), os.listdir("."))))
 print(SAMPLES)
 rule all:
     input:
@@ -35,11 +44,10 @@ rule all:
         expand(BISMARK + "/{sample}_bismark_bt2_pe.bam", sample=SAMPLES)
 
 
-
 rule fastqc:
     input:
-        R1 = "{sample}_R1.fastq.gz",
-        R2 = "{sample}_R2.fastq.gz"
+        R1 = "{sample}_R1" + SUFFIX,
+        R2 = "{sample}_R2" + SUFFIX
     threads:
         16
     params:
@@ -71,8 +79,8 @@ rule multiqc:
 
 rule trim:
     input:
-        R1 = "{sample}_R1.fastq.gz",
-        R2 = "{sample}_R2.fastq.gz"
+        R1 = "{sample}_R1" + SUFFIX,
+        R2 = "{sample}_R2" + SUFFIX
     output:
         trim1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
         trim2_fq = TRIM_DIR + "/{sample}_R2.fq.gz",
@@ -90,9 +98,9 @@ rule trim:
         trim_base2 = 15,
         tmp_r1 = TRIM_DIR + "/{sample}_R1_val_1.fq.gz",
         tmp_r2 = TRIM_DIR + "/{sample}_R2_val_2.fq.gz",
-        R1 = expand(TRIM_DIR + "/{sample}_R1_val_1_fastqc.{Ext}", Ext=["zip", "html"], allow_missing=True),
-        R2 = expand(TRIM_DIR + "/{sample}_R2_val_2_fastqc.{Ext}", Ext=["zip", "html"], allow_missing=True),
-        report = expand(TRIM_DIR + "/{sample}_R{Rn}.fq.gz_trimming_report.txt", Rn=[1, 2], allow_missing=True)
+        out = TRIM_DIR + "/" + SAMPLE + "_R[12]_val_[12]_fastqc.*",
+        report = expand(TRIM_DIR + "/{sample}_R{Rn}" + SUFFIX + "_trimming_report.txt", Rn=[1, 2], allow_missing=True)
+        suffix = SUFFIX
 
     run:
         shell("""trim_galore -q 20 --phred33 --fastqc --fastqc_args "-o {params.dir} --noextract --nogroup" \
@@ -103,8 +111,8 @@ rule trim:
             --paired --retain_unpaired -r1 21 -r2 21 {input.R1} {input.R2} &>{log}""")
         shell("mv {params.tmp_r1} {output.trim1_fq}")
         shell("mv {params.tmp_r2} {output.trim2_fq}")
-        shell("""rename "s/_val_[12]/_trimmed/g" {params.R1} {params.R2}""")
-        shell("""rename "s/.fq.gz//g" {params.report}""")
+        shell("""rename "s/_val_[12]/_trimmed/g" {params.out}""")
+        shell("""rename "s/{suffix}//g" {params.report}""")
 
 # rule trim_rename:
 #     input:
@@ -367,15 +375,112 @@ rule preseq:
         shell("rm {params.bam_sorted}")
 
 rule insert_cpg_bias:
+    input:
+        bam_dedup = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.bam",
+        bg_chr1_1kb = HG_QC + "/CpGs.hg38_chr1_1kb_win.bg.gz",
+        rscript_insert = HG_QC + "/density_insert_length.R",
+        rscript_cpgbias = HG_QC + "/CpGbias_1kb.R"
+    params:
+        dir = directory(INSERT_CPG_BIAS),
+        bam_tmp = INSERT_CPG_BIAS + "/{sample}.tmp.bam",
+        insert_tmp = INSERT_CPG_BIAS + "/{sample}.tmp.insert.txt.gz",
+        cov_chr1 = INSERT_CPG_BIAS + "/{sample}.tmp.CpG.cov_chr1_1kb_win.txt.gz"
+    threads:
+        5
+    output:
+        INSERT_CPG_BIAS + "/{sample}.insert_length.txt"
+    log:
+        insert = INSERT_CPG_BIAS + "/{sample}.density_insert_length.R.log",
+        cpgbias = INSERT_CPG_BIAS + "/{sample}.CpGbias_1kb.R.log"
+    run:
+        # select the first 100K alignments
+        shell("samtools view -h -@ {threads} {input.bam_dedup} | \
+            head -100000197 | samtools view -b -o {params.bam_tmp} -@ {threads}")
+        # make temporary insert length txt file
+        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk -vOFS="\t" "{{print $1,$2,$6,$6-$2}}" | gzip -nc > {params.insert_tmp}""")
+
+        # select only chr1 
+        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk "$1==\\"chr1\\"" | \
+            coverageBed -counts -a {input.bg_chr1_1kb} -b stdin | awk "$4>0 && $5>0" | gzip -nc > {params.cov_chr1}""")
+
+        # run rscripts
+        shell("Rscript {input.rscript_insert} {params.insert_tmp} {output} &> {log.insert}")
+        shell("Rscript {input.rscript_cpgbias} {params.cov_chr1} {wildcards.sample} &> {log.cpgbias}")
+
+        # remove temporary files
+        shell("rm {params.bam_tmp} {params.insert_tmp} {params.cov_chr1}")
+
+rule qc_cal_genome_cov:
+    input:
+        BISMARK + "/{sample}_bismark_bt2.CXme.txt"
+    params:
+        directory(COVERAGE)
+    output:
+        COVERAGE + "/{sample}.genome_cov.txt"
+    run:
+        cnt_c = 598683433 + 600854940 - 171823 * 2
+        cnt_cg = 29303965 * 2
+        s = 0
+        with open({input}, "r") as f:
+            for line in f:
+                cols = line.split("\t")
+                s += cols[1] + cols[2]
+        c_cov = s / cnt_c
+        cg_cov = s / cnt_cg
+        with open({output}, "w") as f:
+            print("{wildcards.smaple}\t{c_cov}\t{cg_cov}", file=f)
+
+rule track_coverage:
+    input:
+        bam_in = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.bam",
+    params:
+        dir = directory(TRACKS)
+    threads:
+        8
+    output:
+        bam_sorted = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.sorted.bam"
+        cov_out = TRACKS + "/{sample}.cov.bg.gz"
+    run:
+        shell("samtools sort -m 2G -o {output.bam_sorted} -T /tmp/{sample} -@ {threads} {input.bam_in}")
+        shell("genomeCoverageBed -bg -ibam {output.bam_sorted} | \
+            bgzip > {output.cov_out} && tabix -p bed {output.cov_out}")
+
+rule track_mergedCG:
+    input:
+        BISMARK + "/{sample}.CX_report.txt.gz"
+    params:
+        dir = directory(TRACKS)
+    output:
+        TRACKS + "/{sample}.CG.methylC.gz"
+    shell:
+        """zcat {input} | \
+            awk -F"\t" "BEGIN{{OFS=FS}} $6==\\"CG\\" && $4+$5>0 {{ if ($3==\\"+\\") {print $1,$2-1,$2+1,$4,$5} if ($3=="-") {{print $1,$2-2,$2,$4,$5}} }}" | \
+            sort -k1,1 -k2,2n | groupBy -g 1,2,3 -c 4,5 -o sum,sum | \
+            awk -F"\t" "BEGIN{{OFS=FS}} {{mcg=sprintf(\\"%.3f\\", $4/($4+$5)); print $1,$2,$3,\\"CG\\",mcg,\\"+\\",$4+$5 }" | \
+            bgzip > {output} && tabix -p bed {output}"""
 
 
+# rule run_distCGme_cov10:
 
-# rule jsfile:
-#     input:
-#         TEMPLATE_JS
-#     output:
-#         REF + "/" + REF + ".js"
-#     params:
-#         ref = REF, server = SERVER
-#     shell:
-#         """sed "s:refgenome:{params.ref}:g;s|server|{params.server}|g" {input} > {output}"""
+# dir_qc=/scratch/genomes/hg38/wgbs_qc
+# rscript=${dir_qc}/distCGme_cov10.R
+
+
+# # INPUT
+# list=${workdir}/samples.txt
+# sample=$( cat $list | sed "${ID}q;d" )
+
+
+# dir_in=${workdir}/dmr/1_dss_input
+# dss=${dir_in}/${sample}.dss.txt.gz
+
+
+# # OUTPUT
+# dir_out=${workdir}/7_distCGme
+# out=${dir_out}/${sample}_CGme_density_cov10.txt
+# log=${dir_out}/distCGme_cov10.R.${sample}.log
+
+# # COMMANDS
+# mkdir -p $dir_out
+# $rscript $dss $out &>$log
+
