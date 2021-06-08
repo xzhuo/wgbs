@@ -4,6 +4,7 @@ from datetime import datetime
 # PHIX_REF = "/echofs1/data/xiaoyu/genomes/phiX174/phiX174.fa"
 # LAMBDA_DIR = "/echofs1/data/xiaoyu/genomes/lambda"
 # HUMAN_DIR = "/echofs1/data/xiaoyu/genomes/hg38"
+# HG_QC = "/echofs1/data/xiaoyu/genomes/hg38/wgbs_qc"
 PHIX_REF = "/scratch/genomes/phiX174/bwa_index/phiX174.fa"
 LAMBDA_DIR = "/scratch/genomes/lambda"
 HUMAN_DIR = "/scratch/genomes/hg38/bismark"
@@ -19,71 +20,67 @@ INSERT_CPG_BIAS = "4_insert_cpg_bias"
 COVERAGE = "5_coverage"
 TRACKS = "6_tracks"
 
-shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.18.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1 r-ggplot2/2.2.1-python-2.7.15-java-11-r-3.5.1;")
+shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.18.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1;")
 
 # pattern = re.compile(r'\.fastq.gz$')
-SUFFIX = '.fastq.gz'
-suffix_length = SUFFIX.length() + 3
-SAMPLES = list(map(lambda x: x[:-suffix_length], filter(lambda y: y.endswith(SUFFIX), os.listdir("."))))
-print(SAMPLES)
+SUFFIX = '.fq.gz'
+suffix_length = len(SUFFIX) + 3
+SAMPLES = set(map(lambda x: x[:-suffix_length], filter(lambda y: y.endswith(SUFFIX), os.listdir("."))))
+# print(SAMPLES)
 rule all:
     input:
-        expand(QC_DIR + "/{sample}_R1_fastqc.zip", sample=SAMPLES),
-        expand(QC_DIR + "/{sample}_R2_fastqc.zip", sample=SAMPLES),
-        expand(QC_DIR + "/{sample}_R1.html", sample=SAMPLES),
-        expand(QC_DIR + "/{sample}_R2.html", sample=SAMPLES),
-        expand(TRIM_DIR + "/{sample}_R1.fq.gz", sample=SAMPLES),
-        expand(TRIM_DIR + "/{sample}_R2.fq.gz", sample=SAMPLES),
-        expand(TRIM_DIR + "/{sample}_R1_trimmed_fastqc.zip", sample=SAMPLES),
-        expand(TRIM_DIR + "/{sample}_R2_trimmed_fastqc.zip", sample=SAMPLES),
-        expand(TRIM_DIR + "/{sample}_R1_trimming_report.txt", sample=SAMPLES),
-        expand(TRIM_DIR + "/{sample}_R2_trimming_report.txt", sample=SAMPLES),
+        expand(QC_DIR + "/{sample}_R{n}{ext}", sample=SAMPLES, n=[1, 2], ext=["_fastqc.zip", ".html"]),
+        # expand(QC_DIR + "/{sample}_R2_fastqc.zip", sample=SAMPLES),
+        # expand(QC_DIR + "/{sample}_R{n}.html", sample=SAMPLES, n=[1, 2]),
+        # expand(QC_DIR + "/{sample}_R2.html", sample=SAMPLES),
+        expand(TRIM_DIR + "/{sample}_R{n}{ext}", sample=SAMPLES, n=[1, 2], ext=[".fq.gz", "_trimmed_fastqc.zip", "_trimmed_fastqc.html", "_trimming_report.txt"]),
+        # expand(TRIM_DIR + "/{sample}_R2.fq.gz", sample=SAMPLES),
+        # expand(TRIM_DIR + "/{sample}_R{n}_trimmed_fastqc.zip", sample=SAMPLES, n=[1, 2]),
+        # # expand(TRIM_DIR + "/{sample}_R2_trimmed_fastqc.zip", sample=SAMPLES),
+        # expand(TRIM_DIR + "/{sample}_R{n}_trimming_report.txt", sample=SAMPLES, n=[1, 2]),
+        # expand(TRIM_DIR + "/{sample}_R2_trimming_report.txt", sample=SAMPLES),
         expand(PHIX_DIR + "/{sample}.bwa_phiX.{ext}", sample=SAMPLES, ext=["bam", "txt"]),
         expand(BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt", sample=SAMPLES),
-        expand(BISMARK + "/{sample}_bismark_bt2.CXme.txt", sample=SAMPLES),
-        expand(BISMARK + "/{sample}_bismark_bt2_pe.bam", sample=SAMPLES)
+        expand(BISMARK + "/{sample}_bismark_bt2{ext}", sample=SAMPLES, ext=[".CXme.txt", "_pe.bam"]),
+        expand(PRESEQ + "/{sample}.preseq_lc_extrap.txt", sample=SAMPLES),
+        expand(INSERT_CPG_BIAS + "/{sample}.insert_length.txt", sample=SAMPLES),
+        expand(COVERAGE + "/{sample}.genome_cov.txt", sample=SAMPLES),
+        expand(TRACKS + "/{sample}.{ext}", sample=SAMPLES, ext=["cov.bg.gz", "CG.methylC.gz"]),
 
 
 rule fastqc:
     input:
-        R1 = "{sample}_R1" + SUFFIX,
-        R2 = "{sample}_R2" + SUFFIX
+        expand("{sample}_R{n}" + SUFFIX, n=[1, 2], allow_missing=True)
     threads:
         16
     params:
         dir = directory(QC_DIR)
     output:
-        R1 = QC_DIR + "/{sample}_R1_fastqc.zip",
-        R2 = QC_DIR + "/{sample}_R2_fastqc.zip"
+        expand(QC_DIR + "/{sample}_R{n}_fastqc.zip", n=[1, 2], allow_missing=True)
     log:
         QC_DIR + "/{sample}.fastqc.log"
     shell:
-        "fastqc -o {params.dir} --noextract --nogroup -t {threads} {input.R1} {input.R2} &> {log}"
+        "fastqc -o {params.dir} --noextract --nogroup -t {threads} {input[0]} {input[1]} &> {log}"
 
 rule multiqc:
     input:
-        R1 = QC_DIR + "/{sample}_R1_fastqc.zip",
-        R2 = QC_DIR + "/{sample}_R2_fastqc.zip"
+        QC_DIR + "/{sample}_R{n}_fastqc.zip"
     params:
-        R1 = QC_DIR + "/{sample}_R1",
-        R2 = QC_DIR + "/{sample}_R2"
+        reads = QC_DIR + "/{sample}_R{n}"
     output:
-        R1 = QC_DIR + "/{sample}_R1.html", 
-        R2 = QC_DIR + "/{sample}_R2.html"
+        QC_DIR + "/{sample}_R{n}.html"
     log:
-        R1 = QC_DIR + "/{sample}_R1.multiqc_fastqc.log",
-        R2 = QC_DIR + "/{sample}_R2.multiqc_fastqc.log"
+        QC_DIR + "/{sample}_R{n}.multiqc_fastqc.log"
     run:
-        shell("multiqc -m fastqc -n {params.R1} -v {input.R1} &> {log.R1}")
-        shell("multiqc -m fastqc -n {params.R2} -v {input.R2} &> {log.R2}")
+        shell("multiqc -m fastqc -n {params} -v {input} &> {log}")
 
 rule trim:
     input:
-        R1 = "{sample}_R1" + SUFFIX,
-        R2 = "{sample}_R2" + SUFFIX
+        expand("{sample}_R{n}" + SUFFIX, n=[1, 2], allow_missing=True)
+        # R2 = "{sample}_R2" + SUFFIX
     output:
-        trim1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
-        trim2_fq = TRIM_DIR + "/{sample}_R2.fq.gz",
+        trim_fq = expand(TRIM_DIR + "/{sample}_R{n}.fq.gz", n=[1, 2], allow_missing=True),
+        # trim2_fq = TRIM_DIR + "/{sample}_R2.fq.gz",
         # outs_R1 = multiext(TRIM_DIR + "/{sample}_R1", ".fq.gz_trimming_report.txt", "_val_1_fastqc.html", "_val_1_fastqc.zip"),
         # outs_R2 = multiext(TRIM_DIR + "/{sample}_R2", ".fq.gz_trimming_report.txt", "_val_2_fastqc.html", "_val_2_fastqc.zip"),
         out = expand(TRIM_DIR + "/{sample}_R{Rn}_trimmed_fastqc.{Ext}", Rn=[1, 2], Ext=["zip", "html"], allow_missing=True),
@@ -96,66 +93,54 @@ rule trim:
         dir = directory(TRIM_DIR),
         trim_base1 = 10,
         trim_base2 = 15,
-        tmp_r1 = TRIM_DIR + "/{sample}_R1_val_1.fq.gz",
-        tmp_r2 = TRIM_DIR + "/{sample}_R2_val_2.fq.gz",
-        out = TRIM_DIR + "/" + SAMPLE + "_R[12]_val_[12]_fastqc.*",
+        tmp = expand(TRIM_DIR + "/{sample}_R{rn}_val_{vn}.fq.gz", zip, rn=[1, 2], vn=[1, 2], allow_missing=True),
+        # tmp_r2 = TRIM_DIR + "/{sample}_R2_val_2.fq.gz",
+        out = TRIM_DIR + "/{sample}_R[12]_val_[12]_fastqc.*",
         report = expand(TRIM_DIR + "/{sample}_R{Rn}" + SUFFIX + "_trimming_report.txt", Rn=[1, 2], allow_missing=True)
-        suffix = SUFFIX
 
     run:
         shell("""trim_galore -q 20 --phred33 --fastqc --fastqc_args "-o {params.dir} --noextract --nogroup" \
             --illumina --stringency 1 -e 0.1 --length 20 \
-            --clip_R1 {params.trim_base1} --clip_R2 {params.trim_base1} \
+            --clip_R1 {params.trim_base1} --clip_R2 {params.trim_base2} \
             -o {params.dir} \
             -j {threads} \
-            --paired --retain_unpaired -r1 21 -r2 21 {input.R1} {input.R2} &>{log}""")
-        shell("mv {params.tmp_r1} {output.trim1_fq}")
-        shell("mv {params.tmp_r2} {output.trim2_fq}")
-        shell("""rename "s/_val_[12]/_trimmed/g" {params.out}""")
-        shell("""rename "s/{suffix}//g" {params.report}""")
-
-# rule trim_rename:
-#     input:
-#         R1 = expand(TRIM_DIR + "/{sample}_R1_val_1_fastqc.{Ext}", Ext=["zip", "html"], allow_missing=True),
-#         R2 = expand(TRIM_DIR + "/{sample}_R2_val_2_fastqc.{Ext}", Ext=["zip", "html"], allow_missing=True),
-#         report = expand(TRIM_DIR + "/{sample}_R{Rn}.fq.gz_trimming_report.txt", Rn=[1, 2], allow_missing=True)
-#     output:
-#         out = expand(TRIM_DIR + "/{sample}_R{Rn}_trimmed_fastqc.{Ext}", Rn=[1, 2], Ext=["zip", "html"], allow_missing=True),
-#         report = expand(TRIM_DIR + "/{sample}_R{Rn}_trimming_report.txt", Rn=[1, 2], allow_missing=True)
-#     run:
-#         shell("""rename "s/_val_[12]/_trimmed/g" {input.R1} {input.R2}""")
-#         shell("""rename "s/.fq.gz//g" {input.report}""")
+            --paired --retain_unpaired -r1 21 -r2 21 {input[0]} {input[1]} &>{log}""")
+        os.rename(params.tmp[0], output.trim_fq[0])
+        os.rename(params.tmp[1], output.trim_fq[1])
+        # shell("""mv {params.tmp_r1} {output.trim1_fq} \
+        # && mv {params.tmp_r2} {output.trim2_fq}""")
+        shell("""rename "s/_val_[12]/_trimmed/g" {params.out} \
+            && rename "s/{SUFFIX}//g" {params.report}""")
 
 rule phix:
     input:
         ref = PHIX_REF,
-        R1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
-        R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
+        reads = expand(TRIM_DIR + "/{sample}_R{n}.fq.gz", n=[1, 2], allow_missing=True)
+        # R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
     params:
         dir = directory(PHIX_DIR),
     output:
         bam = PHIX_DIR + "/{sample}.bwa_phiX.bam",
-        output = PHIX_DIR + "/{sample}.bwa_phiX.txt"
+        txt = PHIX_DIR + "/{sample}.bwa_phiX.txt"
     log:
         PHIX_DIR + "/{sample}.bwa_phiX.log"
     threads:
         4
     run:
-        total = shell("""zcat {input.R1_fq} | grep -c "^@" """, read=True).rstrip()
-        shell("bwa mem -t {threads} {input.ref} {input.R1_fq} {input.R2_fq} 2> {log} | samtools view -b -o {output.bam} -F 4 -@ {threads} -")
-        phi = shell("samtools view -c -@ {threads} {output.bam}", read=True).rstrip()
+        total = int(shell("""zcat {input.reads[0]} | grep -c "^@" """, read=True).rstrip())
+        shell("bwa mem -t {threads} {input.ref} {input.reads[0]} {input.reads[0]} 2> {log} | samtools view -b -o {output.bam} -F 4 -@ {threads} -")
+        phi = int(shell("samtools view -c -@ {threads} {output.bam}", read=True).rstrip())
         # phi_rate = shell("""awk -v c={phi} -v t={total} "BEGIN{{ printf(\\"%.7g\\", c/(t*2))}}" """, read=True).rstrip()
-        # shell("""echo -e "{wildcards.sample}\t{total}\t{phi}\t{phi_rate}" > {output.output}""")
+        # shell("""echo -e "{wildcards.sample}\t{total}\t{phi}\t{phi_rate}" > {output.txt}""")
         phi_rate = phi / (total * 2)
-        with open("{output.output}", "a") as f:
-            print("{:s}\t{:d}\t{:d}\t{:.7g}".format(wildcards.smaple, total, phi, phi_rate), file=f)
-            # print("{wildcard.sample}\t{total}\t{phi}\t{phi_rate}", file=f)
+        with open(output.txt, "w") as f:
+            print("{:s}\t{:d}\t{:d}\t{:.7g}".format(wildcards.sample, total, phi, phi_rate), file=f)
 
 rule bismark_lambda:
     input:
-        # fqs = expand(TRIM_DIR + "/{sample}_R{n}.fq.gz", n=[1, 2], allow_missing=True),
-        R1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
-        R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
+        expand(TRIM_DIR + "/{sample}_R{n}.fq.gz", n=[1, 2], allow_missing=True),
+        # R1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
+        # R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
     threads:
         6
     params:
@@ -164,6 +149,7 @@ rule bismark_lambda:
         max_insert = 2000,
         out_dir = directory(BISMARK_LAMBDA),
         report = "{sample}_bismark_bt2_PE_report.html",
+        temp = BISMARK_LAMBDA + "/{sample}_R1_bismark_bt2_*",
         cg_pe = BISMARK_LAMBDA + "/CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         ch_pe = BISMARK_LAMBDA + "/Non_CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         merged = BISMARK_LAMBDA + "/{sample}_bismark_bt2.extracted.txt.gz",
@@ -195,26 +181,25 @@ rule bismark_lambda:
         # Mapping with bismark/bowtie2
         # Note --bowtie2 and -p $nthreads are both SLOWER than single threaded bowtie1
         print("1. Mapping to reference with bismark/bowtie2... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("bismark -q -I {min_insert} -X {max_insert} --parallel 2 -p {threads} \
+        shell("bismark -q -I {params.min_insert} -X {params.max_insert} --parallel 2 -p {threads} \
             --bowtie2 -N 1 -L 28 --score_min L,0,-0.6 \
             -o {params.out_dir} --temp_dir {TMP_DIR} --gzip --nucleotide_coverage \
-            {ref_dir} -1 {R1_fq} -2 {R2_fq} &>{log.bismark_pe}")
-        for f in (filter(lambda x: x.startswith("{wildcards.sample}_R1_bismark_bt2_"), os.listdir("{params.out_dir}"))):
-            shell("""rename "s/_R1_bismark_bt2/_bismark_bt2/g" {params.out_dir}/{f}""")
+            {params.ref_dir} -1 {input[0]} -2 {input[1]} &>{log.bismark_pe}")
+        shell("""rename "s/_R1_bismark_bt2/_bismark_bt2/g" {params.temp}""")
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p --bam {output.bam_pe}  &>${log.dedup_pe}")
+        shell("deduplicate_bismark -p --bam {output.bam_pe}  &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
-        print("-- 3. Analyse methylation in {output.bam_dedup_pe} using $CPU threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         shell("bismark_methylation_extractor --paired-end --no_overlap --comprehensive --merge_non_CpG --report \
-            -o {out_dir} --gzip --parallel {threads} \
+            -o {params.out_dir} --gzip --parallel {threads} \
             {output.bam_dedup_pe} &>{log.methx_pe}")
 
         # Generate HTML Processing Report
         print("-- 4. Generate bismark HTML processing report file... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("bismark2report -o {params.report} --dir {out_dir} \
+        shell("bismark2report -o {params.report} --dir {params.out_dir} \
            --alignment_report {output.alignment_report} \
            --dedup_report {output.dedup_report} \
            --splitting_report {output.splitting_report} \
@@ -226,37 +211,37 @@ rule bismark_lambda:
         shell("mv {params.ch_pe} {params.merged}")
         shell("cat {params.cg_pe} >>{params.merged}")
 
-        shell("bismark2bedGraph --dir {out_dir} --cutoff 1 --CX_context --buffer_size=75G --scaffolds \
+        shell("bismark2bedGraph --dir {params.out_dir} --cutoff 1 --CX_context --buffer_size=75G --scaffolds \
             -o {params.bedGraph} {params.merged} &>{log.bismark2bg}")
-        shell("rm {out_dir}/{params.bedGraph}")  # $merged
+        shell("rm {params.out_dir}/{params.bedGraph}")  # $merged
 
         # Calculate average methylation levels per each CN context
         print("-- 6. Generate cytosine methylation file... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("coverage2cytosine -o {params.cx_report} --dir {out_dir} --genome_folder {ref_dir} --CX_context --gzip \
+        shell("coverage2cytosine -o {params.cx_report} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
               {params.cov} &>{log.cov2c}")
 
-        shell("rm {out_dir}/{cov}")
-        shell("""zcat {out_dir}/{params.cx_report} | \
+        shell("rm {params.out_dir}/{params.cov}")
+        shell("""zcat {params.out_dir}/{params.cx_report} | \
             awk "BEGIN{{ca=0;cc=0;cg=0;ct=0;mca=0;mcc=0;mcg=0;mct=0}} \
-                 $7~/^CA/ {{ca+=$5; mca+=$4}} \
-                 $7~/^CC/ {{cc+=$5; mcc+=$4}} \
-                 $7~/^CG/ {{cg+=$5; mcg+=$4}} \
-                 $7~/^CT/ {{ct+=$5; mct+=$4}} \
-                 END{{printf(\\"CA\t%d\t%d\t%.3f\n\\", ca, mca, mca/(ca+mca)); \
-                     printf(\\"CC\t%d\t%d\t%.3f\n\\", cc, mcc, mcc/(cc+mcc)); \
-                     printf(\\"CG\t%d\t%d\t%.3f\n\\", cg, mcg, mcg/(cg+mcg)); \
-                     printf(\\"CT\t%d\t%d\t%.3f\n\\", ct, mct, mct/(ct+mct));}" >{output.cx_me}""")
+            \$7~/^CA/ {{ca+=\$5; mca+=\$4}} \
+            \$7~/^CC/ {{cc+=\$5; mcc+=\$4}} \
+            \$7~/^CG/ {{cg+=\$5; mcg+=\$4}} \
+            \$7~/^CT/ {{ct+=\$5; mct+=\$4}} \
+            END{{printf(\\"CA\\t%d\\t%d\\t%.3f\\n\\", ca, mca, mca/(ca+mca)); \
+            printf(\\"CC\\t%d\\t%d\\t%.3f\\n\\", cc, mcc, mcc/(cc+mcc)); \
+            printf(\\"CG\\t%d\\t%d\\t%.3f\\n\\", cg, mcg, mcg/(cg+mcg)); \
+            printf(\\"CT\\t%d\\t%d\\t%.3f\\n\\", ct, mct, mct/(ct+mct));}}" >{output.cx_me}""")
 
         # Print the files generated
         print("-- The results...")
-        shell("ls -l {out_dir}/*{wildcards.sample}*")
+        shell("ls -l {params.out_dir}/*{wildcards.sample}*")
         print("-- Finished on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
 rule bismark:
     input:
-        # fqs = expand(TRIM_DIR + "/{sample}_R{n}.fq.gz", n=[1, 2], allow_missing=True),
-        R1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
-        R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
+        expand(TRIM_DIR + "/{sample}_R{n}.fq.gz", n=[1, 2], allow_missing=True),
+        # R1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
+        # R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
     threads:
         6
     params:
@@ -265,6 +250,7 @@ rule bismark:
         max_insert = 2000,
         out_dir = directory(BISMARK),
         report = "{sample}_bismark_bt2_PE_report.html",
+        temp = BISMARK + "/{sample}_R1_bismark_bt2_*",
         cg_pe = BISMARK + "/CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         ch_pe = BISMARK + "/Non_CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         merged = BISMARK + "/{sample}_bismark_bt2.extracted.txt.gz",
@@ -281,10 +267,10 @@ rule bismark:
         cov2c = BISMARK + "/{sample}.coverage2cytosine.log"
 
     output:
-        read1_unmapped_fq = BISMARK + "/{sample}_R1.fq.gz_unmapped_reads_1.fq.gz",
-        read2_unmapped_fq = BISMARK + "/{sample}_R2.fq.gz_unmapped_reads_2.fq.gz",
-        read_se1_fq = BISMARK + "/{sample}_R1.fq.gz",
-        read_se2_fq = BISMARK + "/{sample}_R2.fq.gz",
+        # read1_unmapped_fq = BISMARK + "/{sample}_R1.fq.gz_unmapped_reads_1.fq.gz",
+        # read2_unmapped_fq = BISMARK + "/{sample}_R2.fq.gz_unmapped_reads_2.fq.gz",
+        # read_se1_fq = BISMARK + "/{sample}_R1.fq.gz",
+        # read_se2_fq = BISMARK + "/{sample}_R2.fq.gz",
         bam_pe = BISMARK + "/{sample}_bismark_bt2_pe.bam",
         bam_dedup_pe = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.bam",
         report = BISMARK + "/{sample}_bismark_bt2_PE_report.html",
@@ -300,26 +286,25 @@ rule bismark:
         # Mapping with bismark/bowtie2
         # Note --bowtie2 and -p $nthreads are both SLOWER than single threaded bowtie1
         print("1. Mapping to reference with bismark/bowtie2... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("bismark -q -I {min_insert} -X {max_insert} --parallel 2 -p {threads} \
+        shell("bismark -q -I {params.min_insert} -X {params.max_insert} --parallel 2 -p {threads} \
             --bowtie2 -N 1 -L 28 --score_min L,0,-0.6 \
             -o {params.out_dir} --temp_dir {TMP_DIR} --gzip --nucleotide_coverage \
-            {ref_dir} -1 {R1_fq} -2 {R2_fq} &>{log.bismark_pe}")
-        for f in (filter(lambda x: x.startswith("{wildcards.sample}_R1_bismark_bt2_"), os.listdir("{params.out_dir}"))):
-            shell("""rename "s/_R1_bismark_bt2/_bismark_bt2/g" {params.out_dir}/{f}""")
+            {params.ref_dir} -1 {input[0]} -2 {input[1]} &>{log.bismark_pe}")
+        shell("""rename "s/_R1_bismark_bt2/_bismark_bt2/g" {params.temp}""")
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p --bam {output.bam_pe}  &>${log.dedup_pe}")
+        shell("deduplicate_bismark -p --bam {output.bam_pe}  &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
-        print("-- 3. Analyse methylation in {output.bam_dedup_pe} using $CPU threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+        print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
         shell("bismark_methylation_extractor --paired-end --no_overlap --comprehensive --merge_non_CpG --report \
-            -o {out_dir} --gzip --parallel {threads} \
+            -o {params.out_dir} --gzip --parallel {threads} \
             {output.bam_dedup_pe} &>{log.methx_pe}")
 
         # Generate HTML Processing Report
         print("-- 4. Generate bismark HTML processing report file... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("bismark2report -o {params.report} --dir {out_dir} \
+        shell("bismark2report -o {params.report} --dir {params.out_dir} \
            --alignment_report {output.alignment_report} \
            --dedup_report {output.dedup_report} \
            --splitting_report {output.splitting_report} \
@@ -331,30 +316,30 @@ rule bismark:
         shell("mv {params.ch_pe} {params.merged}")
         shell("cat {params.cg_pe} >>{params.merged}")
 
-        shell("bismark2bedGraph --dir {out_dir} --cutoff 1 --CX_context --buffer_size=75G --scaffolds \
+        shell("bismark2bedGraph --dir {params.out_dir} --cutoff 1 --CX_context --buffer_size=75G --scaffolds \
             -o {params.bedGraph} {params.merged} &>{log.bismark2bg}")
-        shell("rm {out_dir}/{params.bedGraph}")  # $merged
+        shell("rm {params.out_dir}/{params.bedGraph}")  # $merged
 
         # Calculate average methylation levels per each CN context
         print("-- 6. Generate cytosine methylation file... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("coverage2cytosine -o {params.cx_report} --dir {out_dir} --genome_folder {ref_dir} --CX_context --gzip \
+        shell("coverage2cytosine -o {params.cx_report} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
               {params.cov} &>{log.cov2c}")
 
-        shell("rm {out_dir}/{cov}")
-        shell("""zcat {out_dir}/{params.cx_report} | \
+        shell("rm {params.out_dir}/{params.cov}")
+        shell("""zcat {params.out_dir}/{params.cx_report} | \
             awk "BEGIN{{ca=0;cc=0;cg=0;ct=0;mca=0;mcc=0;mcg=0;mct=0}} \
-                 $7~/^CA/ {{ca+=$5; mca+=$4}} \
-                 $7~/^CC/ {{cc+=$5; mcc+=$4}} \
-                 $7~/^CG/ {{cg+=$5; mcg+=$4}} \
-                 $7~/^CT/ {{ct+=$5; mct+=$4}} \
-                 END{{printf(\\"CA\t%d\t%d\t%.3f\n\\", ca, mca, mca/(ca+mca)); \
-                     printf(\\"CC\t%d\t%d\t%.3f\n\\", cc, mcc, mcc/(cc+mcc)); \
-                     printf(\\"CG\t%d\t%d\t%.3f\n\\", cg, mcg, mcg/(cg+mcg)); \
-                     printf(\\"CT\t%d\t%d\t%.3f\n\\", ct, mct, mct/(ct+mct));}" >{output.cx_me}""")
+                \$7~/^CA/ {{ca+=\$5; mca+=\$4}} \
+                \$7~/^CC/ {{cc+=\$5; mcc+=\$4}} \
+                \$7~/^CG/ {{cg+=\$5; mcg+=\$4}} \
+                \$7~/^CT/ {{ct+=\$5; mct+=\$4}} \
+                END{{printf(\\"CA\\t%d\\t%d\\t%.3f\\n\\", ca, mca, mca/(ca+mca)); \
+                printf(\\"CC\\t%d\\t%d\\t%.3f\\n\\", cc, mcc, mcc/(cc+mcc)); \
+                printf(\\"CG\\t%d\\t%d\\t%.3f\\n\\", cg, mcg, mcg/(cg+mcg)); \
+                printf(\\"CT\\t%d\\t%d\\t%.3f\\n\\", ct, mct, mct/(ct+mct));}}" >{output.cx_me}""")
 
         # Print the files generated
         print("-- The results...")
-        shell("ls -l {out_dir}/*{wildcards.sample}*")
+        shell("ls -l {params.out_dir}/*{wildcards.sample}*")
         print("-- Finished on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
 
 rule preseq:
@@ -390,21 +375,21 @@ rule insert_cpg_bias:
     output:
         INSERT_CPG_BIAS + "/{sample}.insert_length.txt"
     log:
-        insert = INSERT_CPG_BIAS + "/{sample}.density_insert_length.R.log",
+        insert_len = INSERT_CPG_BIAS + "/{sample}.density_insert_length.R.log",
         cpgbias = INSERT_CPG_BIAS + "/{sample}.CpGbias_1kb.R.log"
     run:
         # select the first 100K alignments
         shell("samtools view -h -@ {threads} {input.bam_dedup} | \
             head -100000197 | samtools view -b -o {params.bam_tmp} -@ {threads}")
         # make temporary insert length txt file
-        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk -vOFS="\t" "{{print $1,$2,$6,$6-$2}}" | gzip -nc > {params.insert_tmp}""")
+        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk -v OFS="\t" "{{print \$1,\$2,\$6,\$6-\$2}}" | gzip -nc > {params.insert_tmp}""")
 
         # select only chr1 
-        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk "$1==\\"chr1\\"" | \
-            coverageBed -counts -a {input.bg_chr1_1kb} -b stdin | awk "$4>0 && $5>0" | gzip -nc > {params.cov_chr1}""")
+        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk "\$1==\\"chr1\\"" | \
+            coverageBed -counts -a {input.bg_chr1_1kb} -b stdin | awk "\$4>0 && \$5>0" | gzip -nc > {params.cov_chr1}""")
 
         # run rscripts
-        shell("Rscript {input.rscript_insert} {params.insert_tmp} {output} &> {log.insert}")
+        shell("Rscript {input.rscript_insert} {params.insert_tmp} {output} &> {log.insert_len}")
         shell("Rscript {input.rscript_cpgbias} {params.cov_chr1} {wildcards.sample} &> {log.cpgbias}")
 
         # remove temporary files
@@ -420,15 +405,19 @@ rule qc_cal_genome_cov:
     run:
         cnt_c = 598683433 + 600854940 - 171823 * 2
         cnt_cg = 29303965 * 2
-        s = 0
-        with open({input}, "r") as f:
+        s_cnt_c = 0
+        s_cnt_cg = 0
+        with open(str(input), "r") as f:
             for line in f:
                 cols = line.split("\t")
-                s += cols[1] + cols[2]
-        c_cov = s / cnt_c
-        cg_cov = s / cnt_cg
-        with open({output}, "w") as f:
-            print("{wildcards.smaple}\t{c_cov}\t{cg_cov}", file=f)
+                c = int(cols[1]) + int(cols[2])
+                s_cnt_c += c
+                if cols[0] == "CG":
+                    s_cnt_cg += c
+        c_cov = s_cnt_c / cnt_c
+        cg_cov = s_cnt_cg / cnt_cg
+        with open(str(output), "w") as f:
+            print("{:s}\t{:.3f}\t{:.3f}".format(wildcards.sample, c_cov, cg_cov), file=f)
 
 rule track_coverage:
     input:
@@ -438,10 +427,10 @@ rule track_coverage:
     threads:
         8
     output:
-        bam_sorted = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.sorted.bam"
+        bam_sorted = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.sorted.bam",
         cov_out = TRACKS + "/{sample}.cov.bg.gz"
     run:
-        shell("samtools sort -m 2G -o {output.bam_sorted} -T /tmp/{sample} -@ {threads} {input.bam_in}")
+        shell("samtools sort -m 2G -o {output.bam_sorted} -T /tmp/{wildcards.sample} -@ {threads} {input.bam_in}")
         shell("genomeCoverageBed -bg -ibam {output.bam_sorted} | \
             bgzip > {output.cov_out} && tabix -p bed {output.cov_out}")
 
@@ -454,9 +443,9 @@ rule track_mergedCG:
         TRACKS + "/{sample}.CG.methylC.gz"
     shell:
         """zcat {input} | \
-            awk -F"\t" "BEGIN{{OFS=FS}} $6==\\"CG\\" && $4+$5>0 {{ if ($3==\\"+\\") {print $1,$2-1,$2+1,$4,$5} if ($3=="-") {{print $1,$2-2,$2,$4,$5}} }}" | \
+            awk -F"\\t" "BEGIN{{OFS=FS}} \$6==\\"CG\\" && \$4+\$5>0 {{ if (\$3==\\"+\\") {{print \$1,\$2-1,\$2+1,\$4,\$5}} if (\$3=="-") {{print \$1,\$2-2,\$2,\$4,\$5}} }}" | \
             sort -k1,1 -k2,2n | groupBy -g 1,2,3 -c 4,5 -o sum,sum | \
-            awk -F"\t" "BEGIN{{OFS=FS}} {{mcg=sprintf(\\"%.3f\\", $4/($4+$5)); print $1,$2,$3,\\"CG\\",mcg,\\"+\\",$4+$5 }" | \
+            awk -F"\\t" "BEGIN{{OFS=FS}} {{mcg=sprintf(\\"\%.3f\\", \$4/(\$4+\$5)); print \$1,\$2,\$3,\\"CG\\",mcg,\\"+\\",\$4+\$5 }}" | \
             bgzip > {output} && tabix -p bed {output}"""
 
 
