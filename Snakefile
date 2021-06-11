@@ -45,7 +45,7 @@ rule all:
         expand(PRESEQ + "/{sample}.preseq_lc_extrap.txt", sample=SAMPLES),
         expand(INSERT_CPG_BIAS + "/{sample}.insert_length.txt", sample=SAMPLES),
         expand(COVERAGE + "/{sample}.genome_cov.txt", sample=SAMPLES),
-        expand(TRACKS + "/{sample}.{ext}", sample=SAMPLES, ext=["cov.bg.gz", "CG.methylC.gz"]),
+        expand(TRACKS + "/{sample}.{ext}", sample=SAMPLES, ext=["cov.bg.gz", "CG.methylC.gz"])
 
 
 rule fastqc:
@@ -174,7 +174,8 @@ rule bismark_lambda:
         splitting_report = BISMARK_LAMBDA + "/{sample}_bismark_bt2_pe.deduplicated_splitting_report.txt",
         mbias_report = BISMARK_LAMBDA + "/{sample}_bismark_bt2_pe.deduplicated.M-bias.txt",
         nucleotide_report = BISMARK_LAMBDA + "/{sample}_bismark_bt2_pe.nucleotide_stats.txt",
-        cx_me = BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt"
+        cx_me = BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt",
+        cx_report = BISMARK_LAMBDA + "/{sample}.CX_report.txt.gz"
 
     run:
         print("Started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -189,7 +190,7 @@ rule bismark_lambda:
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p --bam {output.bam_pe}  &>{log.dedup_pe}")
+        shell("deduplicate_bismark -p --bam {output.bam_pe} &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
         print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -245,7 +246,7 @@ rule bismark:
     threads:
         6
     params:
-        ref_dir = directory(LAMBDA_DIR),
+        ref_dir = directory(HUMAN_DIR),
         min_insert = 0,
         max_insert = 2000,
         out_dir = directory(BISMARK),
@@ -279,7 +280,8 @@ rule bismark:
         splitting_report = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated_splitting_report.txt",
         mbias_report = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.M-bias.txt",
         nucleotide_report = BISMARK + "/{sample}_bismark_bt2_pe.nucleotide_stats.txt",
-        cx_me = BISMARK + "/{sample}_bismark_bt2.CXme.txt"
+        cx_me = BISMARK + "/{sample}_bismark_bt2.CXme.txt",
+        cx_report = BISMARK + "/{sample}.CX_report.txt.gz"
 
     run:
         print("Started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -294,7 +296,7 @@ rule bismark:
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p --bam {output.bam_pe}  &>{log.dedup_pe}")
+        shell("deduplicate_bismark -p --bam {output.bam_pe} &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
         print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -443,9 +445,9 @@ rule track_mergedCG:
         TRACKS + "/{sample}.CG.methylC.gz"
     shell:
         """zcat {input} | \
-            awk -F"\\t" "BEGIN{{OFS=FS}} \$6==\\"CG\\" && \$4+\$5>0 {{ if (\$3==\\"+\\") {{print \$1,\$2-1,\$2+1,\$4,\$5}} if (\$3=="-") {{print \$1,\$2-2,\$2,\$4,\$5}} }}" | \
+            awk -F"\\t" "BEGIN{{OFS=FS}} \$6==\\"CG\\" && \$4+\$5>0 {{ if (\$3==\\"+\\") {{print \$1,\$2-1,\$2+1,\$4,\$5}} if (\$3==\\"-\\") {{print \$1,\$2-2,\$2,\$4,\$5}} }}" | \
             sort -k1,1 -k2,2n | groupBy -g 1,2,3 -c 4,5 -o sum,sum | \
-            awk -F"\\t" "BEGIN{{OFS=FS}} {{mcg=sprintf(\\"\%.3f\\", \$4/(\$4+\$5)); print \$1,\$2,\$3,\\"CG\\",mcg,\\"+\\",\$4+\$5 }}" | \
+            awk -F"\\t" "BEGIN{{OFS=FS}} {{mcg=sprintf(\\"%.3f\\", \$4/(\$4+\$5)); print \$1,\$2,\$3,\\"CG\\",mcg,\\"+\\",\$4+\$5 }}" | \
             bgzip > {output} && tabix -p bed {output}"""
 
 
