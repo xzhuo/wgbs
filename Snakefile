@@ -154,7 +154,7 @@ rule bismark_lambda:
         ch_pe = BISMARK_LAMBDA + "/Non_CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         merged = BISMARK_LAMBDA + "/{sample}_bismark_bt2.extracted.txt.gz",
         bedGraph = "{sample}.bedGraph.gz",
-        cov = "{sample}.bismark.cov.gz",
+        cov = BISMARK_LAMBDA + "/{sample}.bismark.cov.gz",
         cx_report = "{sample}.CX_report.txt.gz"
 
     log:
@@ -221,7 +221,7 @@ rule bismark_lambda:
         shell("coverage2cytosine -o {params.cx_report} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
               {params.cov} &>{log.cov2c}")
 
-        shell("rm {params.out_dir}/{params.cov}")
+        shell("rm {params.cov}")
         shell("""zcat {params.out_dir}/{params.cx_report} | \
             awk "BEGIN{{ca=0;cc=0;cg=0;ct=0;mca=0;mcc=0;mcg=0;mct=0}} \
             \$7~/^CA/ {{ca+=\$5; mca+=\$4}} \
@@ -256,7 +256,7 @@ rule bismark:
         ch_pe = BISMARK + "/Non_CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         merged = BISMARK + "/{sample}_bismark_bt2.extracted.txt.gz",
         bedGraph = "{sample}.bedGraph.gz",
-        cov = "{sample}.bismark.cov.gz",
+        cov = BISMARK + "/{sample}.bismark.cov.gz",
         cx_report = "{sample}.CX_report.txt.gz"
 
     log:
@@ -327,7 +327,7 @@ rule bismark:
         shell("coverage2cytosine -o {params.cx_report} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
               {params.cov} &>{log.cov2c}")
 
-        shell("rm {params.out_dir}/{params.cov}")
+        shell("rm {params.cov}")
         shell("""zcat {params.out_dir}/{params.cx_report} | \
             awk "BEGIN{{ca=0;cc=0;cg=0;ct=0;mca=0;mcc=0;mcg=0;mct=0}} \
                 \$7~/^CA/ {{ca+=\$5; mca+=\$4}} \
