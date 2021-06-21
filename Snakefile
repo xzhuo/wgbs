@@ -190,7 +190,7 @@ rule bismark_lambda:
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p --bam {output.bam_pe} &>{log.dedup_pe}")
+        shell("deduplicate_bismark -p -o {output.bam_dedup_pe} --bam {output.bam_pe} &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
         print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -296,7 +296,7 @@ rule bismark:
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p --bam {output.bam_pe} &>{log.dedup_pe}")
+        shell("deduplicate_bismark -p -o {output.bam_dedup_pe} --bam {output.bam_pe} &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
         print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
