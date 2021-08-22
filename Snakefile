@@ -1,15 +1,16 @@
 import re
 from datetime import datetime
+import fnmatch
 
-# PHIX_REF = "/echofs1/data/xiaoyu/genomes/phiX174/phiX174.fa"
-# LAMBDA_DIR = "/echofs1/data/xiaoyu/genomes/lambda"
-# HUMAN_DIR = "/echofs1/data/xiaoyu/genomes/hg38"
-# HG_QC = "/echofs1/data/xiaoyu/genomes/hg38/wgbs_qc"
-PHIX_REF = "/scratch/genomes/phiX174/bwa_index/phiX174.fa"
-LAMBDA_DIR = "/scratch/genomes/lambda"
-HUMAN_DIR = "/scratch/genomes/hg38/bismark"
-HG_QC = "/scratch/genomes/hg38/wgbs_qc"
-TMP_DIR = "/tmp"
+PHIX_REF = "/echofs2/data/xiaoyu/genomes/phiX174/bwa_index/phiX174.fa"
+LAMBDA_DIR = "/echofs2/data/xiaoyu/genomes/lambda"
+HUMAN_DIR = "/echofs2/data/xiaoyu/genomes/hg38/bismark"
+HG_QC = "/echofs2/data/xiaoyu/genomes/hg38/wgbs_qc"
+# PHIX_REF = "/scratch/genomes/phiX174/bwa_index/phiX174.fa"
+# LAMBDA_DIR = "/scratch/genomes/lambda"
+# HUMAN_DIR = "/scratch/genomes/hg38/bismark"
+# HG_QC = "/scratch/genomes/hg38/wgbs_qc"
+TMP_DIR = "/echofs2/data/xiaoyu/tmp"
 QC_DIR = "0_fastqc"
 TRIM_DIR = "1_trim"
 PHIX_DIR = "1_phix"
@@ -20,25 +21,19 @@ INSERT_CPG_BIAS = "4_insert_cpg_bias"
 COVERAGE = "5_coverage"
 TRACKS = "6_tracks"
 
-shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.18.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1;")
+# shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.18.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1;")
 
 # pattern = re.compile(r'\.fastq.gz$')
-SUFFIX = '.fq.gz'
+SUFFIX = '.fastq.gz'
 suffix_length = len(SUFFIX) + 3
 SAMPLES = set(map(lambda x: x[:-suffix_length], filter(lambda y: y.endswith(SUFFIX), os.listdir("."))))
+# SAMPLES = set(map(lambda x: x[:-suffix_length], fnmatch.filter(os.listdir("."), '*_L003*.fastq.gz')))
 # print(SAMPLES)
+
 rule all:
     input:
         expand(QC_DIR + "/{sample}_R{n}{ext}", sample=SAMPLES, n=[1, 2], ext=["_fastqc.zip", ".html"]),
-        # expand(QC_DIR + "/{sample}_R2_fastqc.zip", sample=SAMPLES),
-        # expand(QC_DIR + "/{sample}_R{n}.html", sample=SAMPLES, n=[1, 2]),
-        # expand(QC_DIR + "/{sample}_R2.html", sample=SAMPLES),
         expand(TRIM_DIR + "/{sample}_R{n}{ext}", sample=SAMPLES, n=[1, 2], ext=[".fq.gz", "_trimmed_fastqc.zip", "_trimmed_fastqc.html", "_trimming_report.txt"]),
-        # expand(TRIM_DIR + "/{sample}_R2.fq.gz", sample=SAMPLES),
-        # expand(TRIM_DIR + "/{sample}_R{n}_trimmed_fastqc.zip", sample=SAMPLES, n=[1, 2]),
-        # # expand(TRIM_DIR + "/{sample}_R2_trimmed_fastqc.zip", sample=SAMPLES),
-        # expand(TRIM_DIR + "/{sample}_R{n}_trimming_report.txt", sample=SAMPLES, n=[1, 2]),
-        # expand(TRIM_DIR + "/{sample}_R2_trimming_report.txt", sample=SAMPLES),
         expand(PHIX_DIR + "/{sample}.bwa_phiX.{ext}", sample=SAMPLES, ext=["bam", "txt"]),
         expand(BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt", sample=SAMPLES),
         expand(BISMARK + "/{sample}_bismark_bt2{ext}", sample=SAMPLES, ext=[".CXme.txt", "_pe.bam"]),
@@ -46,7 +41,6 @@ rule all:
         expand(INSERT_CPG_BIAS + "/{sample}.insert_length.txt", sample=SAMPLES),
         expand(COVERAGE + "/{sample}.genome_cov.txt", sample=SAMPLES),
         expand(TRACKS + "/{sample}.{ext}", sample=SAMPLES, ext=["cov.bg.gz", "CG.methylC.gz"])
-
 
 rule fastqc:
     input:
@@ -142,7 +136,7 @@ rule bismark_lambda:
         # R1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
         # R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
     threads:
-        6
+        12
     params:
         ref_dir = directory(LAMBDA_DIR),
         min_insert = 0,
@@ -155,7 +149,9 @@ rule bismark_lambda:
         merged = BISMARK_LAMBDA + "/{sample}_bismark_bt2.extracted.txt.gz",
         bedGraph = "{sample}.bedGraph.gz",
         cov = BISMARK_LAMBDA + "/{sample}.bismark.cov.gz",
-        cx_report = "{sample}.CX_report.txt.gz"
+        cx_report = "{sample}.CX_report.txt.gz",
+        parallel = 2,
+        bt_p = 6
 
     log:
         bismark_pe = BISMARK_LAMBDA + "/{sample}.bismark.log",
@@ -182,7 +178,7 @@ rule bismark_lambda:
         # Mapping with bismark/bowtie2
         # Note --bowtie2 and -p $nthreads are both SLOWER than single threaded bowtie1
         print("1. Mapping to reference with bismark/bowtie2... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("bismark -q -I {params.min_insert} -X {params.max_insert} --parallel 2 -p {threads} \
+        shell("bismark -q -I {params.min_insert} -X {params.max_insert} --parallel {params.parallel} -p {params.bt_p} \
             --bowtie2 -N 1 -L 28 --score_min L,0,-0.6 \
             -o {params.out_dir} --temp_dir {TMP_DIR} --gzip --nucleotide_coverage \
             {params.ref_dir} -1 {input[0]} -2 {input[1]} &>{log.bismark_pe}")
@@ -190,7 +186,7 @@ rule bismark_lambda:
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p -o {output.bam_dedup_pe} --bam {output.bam_pe} &>{log.dedup_pe}")
+        shell("deduplicate_bismark -p --output_dir {params.out_dir} --bam {output.bam_pe} &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
         print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -218,7 +214,7 @@ rule bismark_lambda:
 
         # Calculate average methylation levels per each CN context
         print("-- 6. Generate cytosine methylation file... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("coverage2cytosine -o {params.cx_report} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
+        shell("coverage2cytosine -o {wildcards.sample} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
               {params.cov} &>{log.cov2c}")
 
         shell("rm {params.cov}")
@@ -244,20 +240,24 @@ rule bismark:
         # R1_fq = TRIM_DIR + "/{sample}_R1.fq.gz",
         # R2_fq = TRIM_DIR + "/{sample}_R2.fq.gz"
     threads:
-        6
+        12
+    resources:
+        mem_mb=50000
     params:
         ref_dir = directory(HUMAN_DIR),
         min_insert = 0,
         max_insert = 2000,
         out_dir = directory(BISMARK),
-        report = "{sample}_bismark_bt2_PE_report.html",
         temp = BISMARK + "/{sample}_R1_bismark_bt2_*",
+        parallel = 2,
+        bt_p = 6,
+        report = "{sample}_bismark_bt2_PE_report.html",
         cg_pe = BISMARK + "/CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         ch_pe = BISMARK + "/Non_CpG_context_{sample}_bismark_bt2_pe.deduplicated.txt.gz",
         merged = BISMARK + "/{sample}_bismark_bt2.extracted.txt.gz",
         bedGraph = "{sample}.bedGraph.gz",
         cov = BISMARK + "/{sample}.bismark.cov.gz",
-        cx_report = "{sample}.CX_report.txt.gz"
+        cx_report = "{sample}.CX_report.txt.gz",
 
     log:
         bismark_pe = BISMARK + "/{sample}.bismark.log",
@@ -288,7 +288,7 @@ rule bismark:
         # Mapping with bismark/bowtie2
         # Note --bowtie2 and -p $nthreads are both SLOWER than single threaded bowtie1
         print("1. Mapping to reference with bismark/bowtie2... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("bismark -q -I {params.min_insert} -X {params.max_insert} --parallel 2 -p {threads} \
+        shell("bismark -q -I {params.min_insert} -X {params.max_insert} --parallel {params.parallel} -p {params.bt_p} \
             --bowtie2 -N 1 -L 28 --score_min L,0,-0.6 \
             -o {params.out_dir} --temp_dir {TMP_DIR} --gzip --nucleotide_coverage \
             {params.ref_dir} -1 {input[0]} -2 {input[1]} &>{log.bismark_pe}")
@@ -296,7 +296,7 @@ rule bismark:
 
         # Deduplicate reads
         print("-- 2. Deduplicating aligned reads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("deduplicate_bismark -p -o {output.bam_dedup_pe} --bam {output.bam_pe} &>{log.dedup_pe}")
+        shell("deduplicate_bismark -p --output_dir {params.out_dir} --bam {output.bam_pe} &>{log.dedup_pe}")
 
         # Run methylation extractor for the sample
         print("-- 3. Analyse methylation in " + output.bam_dedup_pe + " using " + str(threads) + " threads... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -318,13 +318,13 @@ rule bismark:
         shell("mv {params.ch_pe} {params.merged}")
         shell("cat {params.cg_pe} >>{params.merged}")
 
-        shell("bismark2bedGraph --dir {params.out_dir} --cutoff 1 --CX_context --buffer_size=75G --scaffolds \
+        shell("bismark2bedGraph --dir {params.out_dir} --cutoff 1 --CX_context --buffer_size=30G \
             -o {params.bedGraph} {params.merged} &>{log.bismark2bg}")
         shell("rm {params.out_dir}/{params.bedGraph}")  # $merged
 
         # Calculate average methylation levels per each CN context
         print("-- 6. Generate cytosine methylation file... started on " + datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
-        shell("coverage2cytosine -o {params.cx_report} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
+        shell("coverage2cytosine -o {wildcards.sample} --dir {params.out_dir} --genome_folder {params.ref_dir} --CX_context --gzip \
               {params.cov} &>{log.cov2c}")
 
         shell("rm {params.cov}")
@@ -357,7 +357,7 @@ rule preseq:
     threads:
         workflow.cores * 0.5 - 1
     run:
-        shell("samtools sort -m 2G -o {params.bam_sorted} -T /tmp/{wildcards.sample} -@ threads {input}")
+        shell("samtools sort -m 2G -o {params.bam_sorted} -T /tmp/{wildcards.sample} -@ {threads} {input}")
         shell("preseq lc_extrap -o {output} -B -P -D {params.bam_sorted} 2>{log}")
         shell("rm {params.bam_sorted}")
 
@@ -371,9 +371,10 @@ rule insert_cpg_bias:
         dir = directory(INSERT_CPG_BIAS),
         bam_tmp = INSERT_CPG_BIAS + "/{sample}.tmp.bam",
         insert_tmp = INSERT_CPG_BIAS + "/{sample}.tmp.insert.txt.gz",
-        cov_chr1 = INSERT_CPG_BIAS + "/{sample}.tmp.CpG.cov_chr1_1kb_win.txt.gz"
+        cov_chr1 = INSERT_CPG_BIAS + "/{sample}.tmp.CpG.cov_chr1_1kb_win.txt.gz",
+	sam_threads = 5
     threads:
-        5
+        10
     output:
         INSERT_CPG_BIAS + "/{sample}.insert_length.txt"
     log:
@@ -381,13 +382,13 @@ rule insert_cpg_bias:
         cpgbias = INSERT_CPG_BIAS + "/{sample}.CpGbias_1kb.R.log"
     run:
         # select the first 100K alignments
-        shell("samtools view -h -@ {threads} {input.bam_dedup} | \
-            head -100000197 | samtools view -b -o {params.bam_tmp} -@ {threads}")
+        # shell("samtools view -h -@ {params.sam_threads} {input.bam_dedup} | \
+        #    head -100000197 | samtools view -b -o {params.bam_tmp} -@ {params.sam_threads}")
         # make temporary insert length txt file
-        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk -v OFS="\t" "{{print \$1,\$2,\$6,\$6-\$2}}" | gzip -nc > {params.insert_tmp}""")
+        shell("""bamToBed -bedpe -i {input.bam_dedup} | awk -v OFS="\t" "{{print \$1,\$2,\$6,\$6-\$2}}" | gzip -nc > {params.insert_tmp}""")
 
         # select only chr1 
-        shell("""bamToBed -bedpe -i {params.bam_tmp} | awk "\$1==\\"chr1\\"" | \
+        shell("""bamToBed -bedpe -i {input.bam_dedup} | awk "\$1==\\"chr1\\"" | \
             coverageBed -counts -a {input.bg_chr1_1kb} -b stdin | awk "\$4>0 && \$5>0" | gzip -nc > {params.cov_chr1}""")
 
         # run rscripts
@@ -395,7 +396,7 @@ rule insert_cpg_bias:
         shell("Rscript {input.rscript_cpgbias} {params.cov_chr1} {wildcards.sample} &> {log.cpgbias}")
 
         # remove temporary files
-        shell("rm {params.bam_tmp} {params.insert_tmp} {params.cov_chr1}")
+        shell("rm {params.insert_tmp} {params.cov_chr1}")
 
 rule qc_cal_genome_cov:
     input:
