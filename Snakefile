@@ -18,7 +18,7 @@ INSERT_CPG_BIAS = "4_insert_cpg_bias"
 COVERAGE = "5_coverage"
 TRACKS = "6_tracks"
 
-# shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.18.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1;")
+# shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.23.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1;")
 
 SUFFIX = '.fastq.gz'
 suffix_length = len(SUFFIX) + 3
