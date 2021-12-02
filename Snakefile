@@ -138,7 +138,7 @@ rule phix:
         4
     run:
         total = int(shell("""zcat {input.reads[0]} | grep -c "^@" """, read=True).rstrip())
-        shell("bwa mem -t {threads} {input.ref} {input.reads[0]} {input.reads[0]} 2> {log} | samtools view -b -o {output.bam} -F 4 -@ {threads} -")
+        shell("bwa mem -t {threads} {input.ref} {input.reads[0]} {input.reads[1]} 2> {log} | samtools view -b -o {output.bam} -F 4 -@ {threads} -")
         phi = int(shell("samtools view -c -@ {threads} {output.bam}", read=True).rstrip())
         # phi_rate = shell("""awk -v c={phi} -v t={total} "BEGIN{{ printf(\\"%.7g\\", c/(t*2))}}" """, read=True).rstrip()
         # shell("""echo -e "{wildcards.sample}\t{total}\t{phi}\t{phi_rate}" > {output.txt}""")
