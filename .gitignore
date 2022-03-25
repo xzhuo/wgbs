@@ -1,6 +1,6 @@
 
 .snakemake/
 wgbs_sync.sh
-sth/
+sth
 include.txt
 toy

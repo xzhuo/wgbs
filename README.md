@@ -7,7 +7,7 @@ Inital pipeline written by Hyung Joo Lee (https://github.com/hyungjoo-lee/wgbs).
 * split bismark into multiple steps
 
 ## manual:
-### ss.smk: snakefile to process a single samples
+### ss.smk: snakefile to process single samples
 example usage:
 ```
 $ cat ss.sh
