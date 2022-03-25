@@ -13,7 +13,12 @@ aggregate_plots <- function(alignment, conversion, reads_number, reads_perc, con
     ggsave(reads_perc, perc)
 
     df <- read.table(conversion,header=T)
-    df <- df %>% select (sample, lambda_rate, CH_conv_rate) %>% gather(type,conversion_rate,lambda_rate,CH_conv_rate)
+    if ("CH_conv_rate" %in% colnames(df)) {
+        df <- df %>% select (sample, lambda_rate, CH_conv_rate) %>% gather(type,conversion_rate,lambda_rate,CH_conv_rate)
+    } else {
+        df <- df %>% select (sample, lambda_rate) %>% gather(type,conversion_rate,lambda_rate)
+    }
+    
     df$conversion_rate <- as.numeric(sub("%","",df$conversion_rate)) / 100
     gg <- ggplot(df,aes(x=sample,y=conversion_rate,fill=type))+geom_bar(stat="identity",position=position_dodge())+scale_y_continuous(labels = scales::percent_format())+coord_flip(ylim = c(0.98,1))+theme_bw()
     ggsave(conversion_pdf, gg)
