@@ -6,7 +6,7 @@ import gzip
 PHIX_REF = "/scratch/genomes/phiX174/bwa_index/phiX174.fa"
 LAMBDA_DIR = "/scratch/genomes/lambda"
 HUMAN_DIR = "/scratch/genomes/hg38/bismark"
-TMP_DIR = "/scratch/xzhuo/tmp"
+TMP_DIR = "/scratch/fanc/tmp"
 QC_DIR = "0_fastqc"
 TRIM_DIR = "1_trim"
 PHIX_DIR = "1_phix"
