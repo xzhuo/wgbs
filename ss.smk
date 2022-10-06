@@ -35,15 +35,16 @@ elif len(re.findall("^n\\d+$", hostname)) == 0:
 else:
     server = "htcf"
 
-genome = config["genome"]
+configfile: "config.yaml"
+# genome = config["genome"]
 if "params" in config.keys():
     include: config["params"]
 
 if server == "ris":
-    PHIX_REF = "/home/fanc/genomes/phiX174/bwa_index/phiX174.fa"
-    LAMBDA_DIR = "/home/fanc/genomes/lambda"
-    REF_DIR = "/home/fanc/genomes/" + genome + "/bismark"
-    pipe_path = "/home/fanc/software/wgbs"
+    PHIX_REF = "/storage1/fs1/hprc/Active/xzhuo/genomes/phiX174"
+    LAMBDA_DIR = "/storage1/fs1/hprc/Active/xzhuo/genomes/lambda"
+    REF_DIR = "/storage1/fs1/hprc/Active/xzhuo/genomes/" + genome + "/bismark"
+    pipe_path = "/storage1/fs1/hprc/Active/xzhuo/github/wgbs"
 elif server == "htcf":
     PHIX_REF = "/scratch/twlab/fanc/genomes/phiX174/bwa_index/phiX174.fa"
     LAMBDA_DIR = "/scratch/twlab/fanc/genomes/lambda"
@@ -540,10 +541,11 @@ rule qc_cal_genome_cov:
     run:
         dedup_pattern = re.compile("Total count of deduplicated leftover sequences:\s+(\d+)")
         dedup_reads = find_number(dedup_pattern, input.dedup_report)
-        genome_size = 3.1 * 10 ** 9
-        max_coverage = dedup_reads * (151 * 2 - 25) / genome_size / 2
-        cnt_c = 598683433 + 600854940 - 171823 * 2
-        cnt_cg = 29303965 * 2
+        genome_size = config["genome_size"]
+        read_length = config["read_length"]
+        max_coverage = dedup_reads * (read_length * 2 - 25) / genome_size / 2
+        cnt_c = config["num_C"] + config["num_G"]
+        cnt_cg = config["num_CG"] * 2
         s_cnt_c = 0
         s_cnt_cg = 0
         with open(input.bismark_cx, "r") as f:
