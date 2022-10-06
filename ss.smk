@@ -36,7 +36,7 @@ else:
     server = "htcf"
 
 configfile: "config.yaml"
-# genome = config["genome"]
+genome = config["genome"]
 if "params" in config.keys():
     include: config["params"]
 
