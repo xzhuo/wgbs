@@ -1,6 +1,6 @@
 genome: "hg38"
-genome_size: "3.1 * 10 ** 9"
-read_length: "151"
-num_C: "598683433"
-num_G: "600854940"
-num_CG: "29303965"
+genome_size: 3.1E+9
+read_length: 151
+num_C: 598683433
+num_G: 600854940
+num_CG: 29303965
