@@ -41,7 +41,7 @@ if "params" in config.keys():
     include: config["params"]
 
 if server == "ris":
-    PHIX_REF = "/storage1/fs1/hprc/Active/xzhuo/genomes/phiX174"
+    PHIX_REF = "/storage1/fs1/hprc/Active/xzhuo/genomes/phiX174/bwa_index/phiX174.fa"
     LAMBDA_DIR = "/storage1/fs1/hprc/Active/xzhuo/genomes/lambda"
     REF_DIR = "/storage1/fs1/hprc/Active/xzhuo/genomes/" + genome + "/bismark"
     pipe_path = "/storage1/fs1/hprc/Active/xzhuo/github/wgbs"
