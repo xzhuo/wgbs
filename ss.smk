@@ -35,8 +35,9 @@ elif len(re.findall("^n\\d+$", hostname)) == 0:
 else:
     server = "htcf"
 
+print(server)
 configfile: "config.yaml"
-# genome = config["genome"]
+genome = config["genome"]
 if "params" in config.keys():
     include: config["params"]
 
