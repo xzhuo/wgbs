@@ -465,7 +465,7 @@ rule preseq:
         threads_preseq
     run:
         shell("samtools sort -m 2G -o {params.bam_sorted} -T {params.temptDir}/preseq_{wildcards.sample} -@ {threads} {input}")
-        shell("preseq lc_extrap -o {output} -B -P -D {params.bam_sorted} 2>{log}")
+        shell("preseq lc_extrap -o {output} -B -P {params.bam_sorted} 2>{log}")
 
 rule track_coverage:
     input:
