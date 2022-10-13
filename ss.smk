@@ -44,7 +44,7 @@ if "params" in config.keys():
 if server == "ris":
     PHIX_REF = "/storage1/fs1/hprc/Active/xzhuo/genomes/phiX174/bwa_index/phiX174.fa"
     LAMBDA_DIR = "/storage1/fs1/hprc/Active/xzhuo/genomes/lambda"
-    REF_DIR = "/storage1/fs1/hprc/Active/xzhuo/genomes/" + genome + "/bismark"
+    REF_DIR = "/storage1/fs1/hprc/Active/xzhuo/genomes/" + genome
     pipe_path = "/storage1/fs1/hprc/Active/xzhuo/github/wgbs"
 elif server == "htcf":
     PHIX_REF = "/scratch/twlab/fanc/genomes/phiX174/bwa_index/phiX174.fa"
@@ -501,7 +501,7 @@ rule track_mergedCG:
 rule insert_cpg_bias:
     input:
         bam_dedup = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.bam",
-        bg_chr1_1kb = "scripts/CpGs.hg38_chr1_1kb_win.bg.gz",
+        bg_chr1_1kb = REF_DIR + "/CpGs.hg38_chr1_1kb_win.bg.gz",
         rscript_insert = "scripts/density_insert_length.R",
         rscript_cpgbias = "scripts/CpGbias_1kb.R"
     params:
