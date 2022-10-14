@@ -62,21 +62,23 @@ else:
 trash = os.system("rm -rf scripts")
 trash = os.system("ln -s " + pipe_path + "/scripts ./")
 
-SUFFIX = '.fq.gz'
+SUFFIX = '.fastq.gz'
 suffix_length = len(SUFFIX) + 3
+# SAMPLES = set(map(lambda x: x[:-suffix_length], filter(lambda y: y.endswith(SUFFIX), os.listdir("."))))
+SAMPLES = set(map(lambda x: x[:-suffix_length], fnmatch.filter(os.listdir(FASTQ), '*.fastq.gz')))
 
 rule mode_full:
     input:
-        expand(QC_DIR + "/{sample}_R{n}_fastqc.zip", n=[1, 2], allow_missing=True),
-        expand(TRIM_DIR + "/{sample}_R{n}{ext}", n=[1, 2], ext=[".fq.gz", "_trimmed_fastqc.html", "_trimming_report.txt"], allow_missing=True),
-        expand(TRIM_DIR + "/{sample}_R{Rn}_val_{Rn}_fastqc.zip", Rn=[1, 2], allow_missing=True),
-        expand(PHIX_DIR + "/{sample}.bwa_phiX.{ext}", ext=["bam", "txt"], allow_missing=True),
-        BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt",
-        expand(BISMARK + "/{sample}_bismark_bt2{ext}", ext=[".CXme.txt", "_pe.bam"], allow_missing=True),
-        BISMARK + "/{sample}_bismark_bt2_PE_report.html",
-        PRESEQ + "/{sample}.preseq_lc_extrap.txt",
-        INSERT_CPG_BIAS + "/{sample}.insert_length.txt",
-        COVERAGE + "/{sample}.genome_cov.txt",
+        expand(QC_DIR + "/{sample}_R{n}_fastqc.zip", sample=SAMPLES, n=[1, 2], allow_missing=True),
+        expand(TRIM_DIR + "/{sample}_R{n}{ext}", sample=SAMPLES, n=[1, 2], ext=[".fq.gz", "_trimmed_fastqc.html", "_trimming_report.txt"], allow_missing=True),
+        expand(TRIM_DIR + "/{sample}_R{Rn}_val_{Rn}_fastqc.zip", sample=SAMPLES, Rn=[1, 2], allow_missing=True),
+        expand(PHIX_DIR + "/{sample}.bwa_phiX.{ext}", sample=SAMPLES, ext=["bam", "txt"], allow_missing=True),
+        expand(BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt", sample=SAMPLES, allow_missing=True),
+        expand(BISMARK + "/{sample}_bismark_bt2{ext}", sample=SAMPLES, ext=[".CXme.txt", "_pe.bam"], allow_missing=True),
+        expand(BISMARK + "/{sample}_bismark_bt2_PE_report.html", sample=SAMPLES, allow_missing=True),
+        expand(PRESEQ + "/{sample}.preseq_lc_extrap.txt", sample=SAMPLES, allow_missing=True),
+        expand(INSERT_CPG_BIAS + "/{sample}.insert_length.txt", sample=SAMPLES, allow_missing=True),
+        expand(COVERAGE + "/{sample}.genome_cov.txt", sample=SAMPLES, allow_missing=True),
         expand(TRACKS + "/{sample}.{ext}", ext=["cov.bg.gz", "CG.methylC.gz"], allow_missing=True),
     output:
         "{sample}_mode_full.txt"
