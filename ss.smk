@@ -80,10 +80,10 @@ rule mode_full:
         expand(INSERT_CPG_BIAS + "/{sample}.insert_length.txt", sample=SAMPLES, allow_missing=True),
         expand(COVERAGE + "/{sample}.genome_cov.txt", sample=SAMPLES, allow_missing=True),
         expand(TRACKS + "/{sample}.{ext}", ext=["cov.bg.gz", "CG.methylC.gz"], allow_missing=True),
-    output:
-        "{sample}_mode_full.txt"
-    shell:
-        "echo 'full run' > {output}"
+    # output:
+    #     "{sample}_mode_full.txt"
+    # shell:
+    #     "echo 'full run' > {output}"
 
 rule mode_shallow:
     input:
