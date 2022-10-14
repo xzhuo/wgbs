@@ -66,20 +66,20 @@ SUFFIX = '.fastq.gz'
 suffix_length = len(SUFFIX) + 3
 # SAMPLES = set(map(lambda x: x[:-suffix_length], filter(lambda y: y.endswith(SUFFIX), os.listdir("."))))
 SAMPLES = set(map(lambda x: x[:-suffix_length], fnmatch.filter(os.listdir(FASTQ), '*.fastq.gz')))
-
+print(SAMPLES)
 rule mode_full:
     input:
-        expand(QC_DIR + "/{sample}_R{n}_fastqc.zip", sample=SAMPLES, n=[1, 2], allow_missing=True),
-        expand(TRIM_DIR + "/{sample}_R{n}{ext}", sample=SAMPLES, n=[1, 2], ext=[".fq.gz", "_trimmed_fastqc.html", "_trimming_report.txt"], allow_missing=True),
-        expand(TRIM_DIR + "/{sample}_R{Rn}_val_{Rn}_fastqc.zip", sample=SAMPLES, Rn=[1, 2], allow_missing=True),
-        expand(PHIX_DIR + "/{sample}.bwa_phiX.{ext}", sample=SAMPLES, ext=["bam", "txt"], allow_missing=True),
-        expand(BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt", sample=SAMPLES, allow_missing=True),
-        expand(BISMARK + "/{sample}_bismark_bt2{ext}", sample=SAMPLES, ext=[".CXme.txt", "_pe.bam"], allow_missing=True),
-        expand(BISMARK + "/{sample}_bismark_bt2_PE_report.html", sample=SAMPLES, allow_missing=True),
+        expand(QC_DIR + "/{sample}_R{n}_fastqc.zip", sample=SAMPLES, n=[1, 2]),
+        expand(TRIM_DIR + "/{sample}_R{n}{ext}", sample=SAMPLES, n=[1, 2], ext=[".fq.gz", "_trimmed_fastqc.html", "_trimming_report.txt"]),
+        expand(TRIM_DIR + "/{sample}_R{Rn}_val_{Rn}_fastqc.zip", sample=SAMPLES, Rn=[1, 2]),
+        expand(PHIX_DIR + "/{sample}.bwa_phiX.{ext}", sample=SAMPLES, ext=["bam", "txt"]),
+        expand(BISMARK_LAMBDA + "/{sample}_bismark_bt2.CXme.txt", sample=SAMPLES),
+        expand(BISMARK + "/{sample}_bismark_bt2{ext}", sample=SAMPLES, ext=[".CXme.txt", "_pe.bam"]),
+        expand(BISMARK + "/{sample}_bismark_bt2_PE_report.html", sample=SAMPLES),
         expand(PRESEQ + "/{sample}.preseq_lc_extrap.txt", sample=SAMPLES, allow_missing=True),
-        expand(INSERT_CPG_BIAS + "/{sample}.insert_length.txt", sample=SAMPLES, allow_missing=True),
-        expand(COVERAGE + "/{sample}.genome_cov.txt", sample=SAMPLES, allow_missing=True),
-        expand(TRACKS + "/{sample}.{ext}", ext=["cov.bg.gz", "CG.methylC.gz"], allow_missing=True),
+        expand(INSERT_CPG_BIAS + "/{sample}.insert_length.txt", sample=SAMPLES),
+        expand(COVERAGE + "/{sample}.genome_cov.txt", sample=SAMPLES),
+        expand(TRACKS + "/{sample}.{ext}", sample=SAMPLES, ext=["cov.bg.gz", "CG.methylC.gz"])
     # output:
     #     "{sample}_mode_full.txt"
     # shell:
@@ -503,7 +503,7 @@ rule track_mergedCG:
 rule insert_cpg_bias:
     input:
         bam_dedup = BISMARK + "/{sample}_bismark_bt2_pe.deduplicated.bam",
-        bg_chr1_1kb = REF_DIR + "/CpGs.hg38_chr1_1kb_win.bg.gz",
+        bg_chr1_1kb = REF_DIR + "/CpGs.chr1.1kb_win.bg.gz",
         rscript_insert = "scripts/density_insert_length.R",
         rscript_cpgbias = "scripts/CpGbias_1kb.R"
     params:
