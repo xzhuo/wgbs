@@ -21,7 +21,7 @@ INSERT_CPG_BIAS = "4_insert_cpg_bias"
 COVERAGE = "5_coverage"
 TRACKS = "6_tracks"
 
-SUFFIX = '.fq.gz'
+SUFFIX = '.fastq.gz'
 
 suffix_length = len(SUFFIX) + 3
 SAMPLES = list(set(map(lambda x: x[:-suffix_length], filter(lambda y: y.endswith(SUFFIX), os.listdir(FASTQ)))))
@@ -35,6 +35,8 @@ elif len(re.findall("^n\\d+$", hostname)) == 0:
 else:
     server = "htcf"
 
+configfile: "config.yaml"
+genome = config["genome"]
 if "params" in config.keys():
     include: config["params"]
 
@@ -45,7 +47,7 @@ elif server == "wanglab":
     shell.prefix("module load FastQC/0.11.5 multiqc/1.7 trim_galore/0.6.6 samtools/1.9 bwa/0.7.15 bismark/0.23.1 preseq/3.1.2 bedtools/2.27.1 htslib/1.3.1 R/3.6.1;")
     pipe_path = "/bar/cfan/software/wgbs"
 else:
-    pipe_path = "/home/fanc/software/wgbs"
+    pipe_path = "/storage1/fs1/hprc/Active/xzhuo/github/wgbs"
 
 trash = os.system("rm -rf scripts")
 trash = os.system("ln -s " + pipe_path + "/scripts ./")
