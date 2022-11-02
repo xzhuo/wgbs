@@ -38,8 +38,11 @@ RUN wget -c https://github.com/samtools/samtools/releases/download/1.15/samtools
     && bzip2 -d samtools-1.15.tar.bz2 && tar -xf samtools-1.15.tar && rm -rf samtools-1.15.tar \
     && cd samtools* && ./configure && make && make install && cd ../
 
-RUN wget -c http://smithlabresearch.org/downloads/preseq_linux_v2.0.tar.bz2 \
-    && bzip2 -d preseq_linux_v2.0.tar.bz2 && tar -xf preseq_linux_v2.0.tar && rm -rf preseq_linux_v2.0.tar
+RUN wget -c https://github.com/smithlabcode/preseq/releases/download/v3.2.0/preseq-3.2.0.tar.gz \
+    && tar -xf preseq-3.2.0.tar.gz && cd preseq_v3.2.0 && make all # buildkit
+
+# RUN wget -c http://smithlabresearch.org/downloads/preseq_linux_v2.0.tar.bz2 \
+#     && bzip2 -d preseq_linux_v2.0.tar.bz2 && tar -xf preseq_linux_v2.0.tar && rm -rf preseq_linux_v2.0.tar
 RUN wget -c https://github.com/arq5x/bedtools2/releases/download/v2.30.0/bedtools.static.binary \
     && mkdir bin && mv bedtools.static.binary bin/bedtools && chmod 755 bin/bedtools
 RUN wget -c https://github.com/samtools/htslib/releases/download/1.15/htslib-1.15.tar.bz2 \
@@ -52,7 +55,7 @@ RUN wget -c https://github.com/FelixKrueger/TrimGalore/archive/0.6.6.tar.gz \
 RUN pip install multiqc
 RUN pip install cutadapt
 RUN rm -rf *.tar *.gz FastQC-0.11.9
-ENV PATH="${PATH}:/opt/apps/FastQC:/opt/apps/TrimGalore-0.6.6:/opt/apps/bin:/opt/apps/bowtie2-2.3.4.1-linux-x86_64:/opt/apps/bwa-0.7.15:/opt/apps/htslib-1.15:/opt/apps/preseq_v2.0:/opt/apps/samtools-1.15:/opt/apps/TrimGalore-0.6.6"
+ENV PATH="${PATH}:/opt/apps/FastQC:/opt/apps/TrimGalore-0.6.6:/opt/apps/bin:/opt/apps/bowtie2-2.3.4.1-linux-x86_64:/opt/apps/bwa-0.7.15:/opt/apps/htslib-1.15:/opt/apps/preseq_v3.2.0:/opt/apps/samtools-1.15:/opt/apps/TrimGalore-0.6.6"
 RUN apt-get install -y sudo rename && apt-get clean
 
 RUN wget -c https://github.com/FelixKrueger/Bismark/archive/refs/tags/0.23.1.tar.gz \
