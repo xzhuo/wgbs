@@ -134,7 +134,7 @@ rule extract_fastqc:
         summary = QC_DIR + "/fq_aggregated/summary.txt",
         stats = QC_DIR + "/fq_aggregated/statistics.txt"
     shell:
-        "scripts/extract_fastqc.sh {params}"
+        "bash scripts/extract_fastqc.sh {params}"
 
 rule extract_trim_fastqc:
     input:
@@ -145,7 +145,7 @@ rule extract_trim_fastqc:
         summary = TRIM_DIR + "/fq_aggregated/summary.txt",
         stats = TRIM_DIR + "/fq_aggregated/statistics.txt"
     shell:
-        "scripts/extract_fastqc.sh {params}"
+        "bash scripts/extract_fastqc.sh {params}"
 
 rule aggregation:
     input:
